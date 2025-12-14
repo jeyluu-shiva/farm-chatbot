@@ -1,10 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Header } from './Header';
 import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 import { IngredientsCard } from './IngredientsCard';
 import { ProductsCard } from './ProductsCard';
 import { StoresCard } from './StoresCard';
+import { RatingSheet } from './RatingSheet';
 import { Message } from '../types';
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
   onBack: () => void;
   onOpenHistory: () => void;
   onOpenSettings: () => void;
+  onRateSession?: (rating: number, feedback: string) => void;
 }
 
 export const ChatScreen: React.FC<Props> = ({
@@ -30,16 +32,52 @@ export const ChatScreen: React.FC<Props> = ({
   inputMode,
   onBack,
   onOpenHistory,
-  onOpenSettings
+  onOpenSettings,
+  onRateSession
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [showRating, setShowRating] = useState(false);
+  const [hasRated, setHasRated] = useState(false); // Only ask once per session view
+  const timerRef = useRef<any>(null);
 
+  // Auto scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  // Inactivity Timer Logic
+  useEffect(() => {
+    // Reset state when messages change (user or bot talks)
+    setShowRating(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    // Conditions to start timer:
+    // 1. Not loading
+    // 2. Hasn't rated yet in this view
+    // 3. Conversation has started (length > 1)
+    // 4. Last message is from BOT (don't interrupt user typing)
+    const lastMessage = messages[messages.length - 1];
+    
+    if (!isLoading && !hasRated && messages.length > 1 && lastMessage?.role === 'bot') {
+      timerRef.current = setTimeout(() => {
+        setShowRating(true);
+      }, 30000); // 30 seconds of inactivity
+    }
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [messages, isLoading, hasRated]);
+
+  const handleRate = (stars: number, feedback: string) => {
+    setHasRated(true);
+    if (onRateSession) {
+      onRateSession(stars, feedback);
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       <Header 
         showBack={true}
         onBack={onBack}
@@ -89,6 +127,16 @@ export const ChatScreen: React.FC<Props> = ({
         )}
         <div ref={bottomRef} />
       </main>
+
+      {/* Rating Sheet Overlay */}
+      <RatingSheet 
+        isOpen={showRating} 
+        onClose={() => {
+          setShowRating(false);
+          setHasRated(true); // Don't show again if closed
+        }}
+        onRate={handleRate}
+      />
 
       <ChatInput 
         onSend={onSend} 

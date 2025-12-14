@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Header } from './components/Header';
-import { ChatScreen } from './components/ChatScreen'; // New Import
+import { ChatScreen } from './components/ChatScreen';
 import { SettingsModal } from './components/SettingsModal';
 import { HistorySidebar } from './components/HistorySidebar';
 import { OnboardingScreen } from './components/OnboardingScreen';
@@ -245,6 +245,11 @@ export default function App() {
     }
   };
 
+  const handleRateSession = (rating: number, feedback: string) => {
+    console.log(`Rating for session ${currentSessionId}: ${rating} stars. Feedback: ${feedback}`);
+    // Here you would typically send this to an API
+  };
+
   // Chat Actions
   const handleSend = async (text: string) => {
     const isFirstUserMsg = messages.length === 1 && messages[0].id === 'welcome';
@@ -387,6 +392,7 @@ export default function App() {
             onBack={() => setCurrentView('home')}
             onOpenHistory={() => setIsHistoryOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            onRateSession={handleRateSession}
           />
         )}
 
