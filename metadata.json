@@ -1,0 +1,7 @@
+{
+  "name": "Trợ lý thuốc BVTV",
+  "description": "A neutral, educational agricultural assistant for farmers to identify crop diseases and find nearby stores.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
