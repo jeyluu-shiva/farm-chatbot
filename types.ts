@@ -68,6 +68,7 @@ export type AppView = 'onboarding' | 'home' | 'chat' | 'profile' | 'calculator';
 
 export interface UserProfile {
   name: string;
+  phoneNumber?: string;
   avatar?: string;
   crops?: string[];
 }

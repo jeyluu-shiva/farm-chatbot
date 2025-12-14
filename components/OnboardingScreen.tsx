@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sprout, ChevronRight, User, Check, Wheat } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sprout, ChevronRight, User, Check, Wheat, Phone, ShieldCheck, ArrowRight, RefreshCw } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface Props {
@@ -7,9 +7,26 @@ interface Props {
 }
 
 export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
+  // Steps: 1: Welcome, 2: Phone, 3: OTP, 4: Name, 5: Crops
   const [step, setStep] = useState(1);
+  
+  // Data State
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
   const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
+  
+  // UI/Logic State
+  const [countdown, setCountdown] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    let timer: any;
+    if (countdown > 0) {
+      timer = setInterval(() => setCountdown(prev => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [countdown]);
 
   const cropOptions = [
     'Lúa',
@@ -21,6 +38,34 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
     'Cây cảnh',
     'Khác'
   ];
+
+  // Logic: Send OTP
+  const handleSendOtp = () => {
+    if (phoneNumber.length < 9) return;
+    setIsLoading(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsLoading(false);
+      setStep(3);
+      setCountdown(60); // 60s cooldown
+      // In a real app, this triggers SMS
+      console.log("OTP Sent to", phoneNumber);
+    }, 1000);
+  };
+
+  // Logic: Verify OTP
+  const handleVerifyOtp = () => {
+    if (otp.length !== 6) return;
+    setIsLoading(true);
+
+    // Simulate Verify API
+    setTimeout(() => {
+      setIsLoading(false);
+      // Success
+      setStep(4);
+    }, 800);
+  };
 
   const handleNext = () => {
     setStep(prev => prev + 1);
@@ -37,9 +82,12 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
   const handleFinish = () => {
     onComplete({
       name: name || 'Nhà nông',
+      phoneNumber: phoneNumber,
       crops: selectedCrops
     });
   };
+
+  const totalSteps = 5;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex flex-col relative overflow-hidden">
@@ -47,8 +95,8 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
       {step > 1 && (
         <div className="absolute top-0 left-0 right-0 h-1 bg-slate-100">
           <div 
-            className="h-full bg-emerald-500 transition-all duration-300" 
-            style={{ width: `${((step - 1) / 2) * 100}%` }} 
+            className="h-full bg-emerald-500 transition-all duration-500 ease-out" 
+            style={{ width: `${((step - 1) / (totalSteps - 1)) * 100}%` }} 
           />
         </div>
       )}
@@ -78,7 +126,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
               onClick={handleNext}
               className="group w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              Bắt đầu ngay
+              Đăng ký tài khoản
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             
@@ -88,8 +136,103 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
           </div>
         )}
 
-        {/* STEP 2: NAME INPUT */}
+        {/* STEP 2: PHONE INPUT */}
         {step === 2 && (
+          <div className="w-full max-w-xs animate-fade-in-up">
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Phone className="w-8 h-8 text-blue-600" />
+            </div>
+
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">Số điện thoại</h2>
+            <p className="text-slate-500 mb-8">Nhập số điện thoại để tạo tài khoản</p>
+
+            <div className="relative mb-6">
+              <input 
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, ''); // Only numbers
+                  setPhoneNumber(val);
+                }}
+                placeholder="0912 345 678"
+                autoFocus
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-4 text-2xl text-center font-bold tracking-widest shadow-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                maxLength={10}
+              />
+            </div>
+
+            <button 
+              onClick={handleSendOtp}
+              disabled={phoneNumber.length < 9 || isLoading}
+              className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-200 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  Tiếp tục <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* STEP 3: OTP VERIFICATION */}
+        {step === 3 && (
+          <div className="w-full max-w-xs animate-fade-in-up">
+            <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <ShieldCheck className="w-8 h-8 text-purple-600" />
+            </div>
+
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">Xác thực OTP</h2>
+            <p className="text-slate-500 mb-8">
+              Mã xác thực đã gửi đến <span className="font-bold text-slate-700">{phoneNumber}</span>
+            </p>
+
+            <input 
+              type="text"
+              value={otp}
+              onChange={(e) => {
+                 const val = e.target.value.replace(/\D/g, '');
+                 setOtp(val);
+              }}
+              placeholder="000000"
+              maxLength={6}
+              autoFocus
+              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-4 text-3xl text-center font-bold tracking-[0.5em] shadow-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 mb-6"
+            />
+
+            <button 
+              onClick={handleVerifyOtp}
+              disabled={otp.length !== 6 || isLoading}
+              className="w-full bg-purple-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-purple-200 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+               {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                'Xác thực'
+              )}
+            </button>
+
+            <div className="mt-6 flex justify-center">
+              {countdown > 0 ? (
+                <span className="text-sm text-slate-400 font-medium">
+                  Gửi lại mã sau {countdown}s
+                </span>
+              ) : (
+                <button 
+                  onClick={handleSendOtp}
+                  className="flex items-center gap-2 text-sm text-emerald-600 font-bold hover:underline"
+                >
+                  <RefreshCw className="w-4 h-4" /> Gửi lại mã
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: NAME INPUT */}
+        {step === 4 && (
           <div className="w-full max-w-xs animate-fade-in-up">
             <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <User className="w-8 h-8 text-blue-500" />
@@ -117,8 +260,8 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
           </div>
         )}
 
-        {/* STEP 3: CROP SELECTION */}
-        {step === 3 && (
+        {/* STEP 5: CROP SELECTION */}
+        {step === 5 && (
           <div className="w-full max-w-sm animate-fade-in-up">
             <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <Wheat className="w-8 h-8 text-amber-500" />
