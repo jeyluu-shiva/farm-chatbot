@@ -1,10 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Header } from './components/Header';
-import { ChatInput } from './components/Screen1_Input';
-import { ChatMessage } from './components/Screen2_Confirm';
-import { IngredientsCard } from './components/Screen4_Ingredients';
-import { ProductsCard } from './components/Screen5_Products';
-import { StoresCard } from './components/Screen6_Stores';
+import { ChatScreen } from './components/ChatScreen'; // New Import
 import { SettingsModal } from './components/SettingsModal';
 import { HistorySidebar } from './components/HistorySidebar';
 import { OnboardingScreen } from './components/OnboardingScreen';
@@ -114,8 +110,6 @@ export default function App() {
     voice: 'Puck'
   });
 
-  const bottomRef = useRef<HTMLDivElement>(null);
-  
   // Web Audio API refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
@@ -177,10 +171,6 @@ export default function App() {
       return updatedSessions;
     });
     
-    // Auto scroll only if we are in chat view
-    if (currentView === 'chat') {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
   }, [messages, currentSessionId]);
 
   // 3. Persist User
@@ -241,6 +231,17 @@ export default function App() {
       } else {
         createNewSession(false);
       }
+    }
+  };
+
+  const handleClearAllHistory = () => {
+    if (sessions.length === 0) return;
+    
+    if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện? Hành động này không thể hoàn tác.')) {
+      setSessions([]);
+      localStorage.removeItem('bvtv_chat_history');
+      createNewSession(false);
+      setIsHistoryOpen(false);
     }
   };
 
@@ -373,67 +374,20 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex justify-center">
       <div className="w-full max-w-md bg-white min-h-screen shadow-2xl overflow-hidden flex flex-col relative">
         
-        {/* VIEW: CHAT */}
+        {/* VIEW: CHAT - Now delegated to ChatScreen component */}
         {currentView === 'chat' && (
-          <div className="flex flex-col h-full">
-            <Header 
-              showBack={true}
-              onBack={() => setCurrentView('home')}
-              onOpenHistory={() => setIsHistoryOpen(true)}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-            />
-            
-            <main className="flex-1 overflow-y-auto px-4 pt-4 pb-2">
-              {messages.map((msg) => {
-                if (msg.type === 'text') {
-                  return (
-                    <ChatMessage 
-                      key={msg.id} 
-                      role={msg.role} 
-                      content={msg.content || ''} 
-                      onPlayAudio={playAudio} 
-                    />
-                  );
-                }
-                if (msg.type === 'ingredients') {
-                  return <IngredientsCard key={msg.id} ingredients={msg.data} />;
-                }
-                if (msg.type === 'products') {
-                  return (
-                    <ProductsCard 
-                      key={msg.id} 
-                      products={msg.data} 
-                      onFindStore={handleFindStoreForProduct}
-                    />
-                  );
-                }
-                if (msg.type === 'stores') {
-                  return <StoresCard key={msg.id} stores={msg.data} />;
-                }
-                return null;
-              })}
-              
-              {isLoading && (
-                <div className="flex gap-3 mb-6 animate-fade-in">
-                  <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center mt-1">
-                    <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                  <div className="bg-white border border-slate-100 p-4 rounded-2xl rounded-tl-none text-slate-400 italic text-sm">
-                    Đang suy nghĩ...
-                  </div>
-                </div>
-              )}
-              <div ref={bottomRef} />
-            </main>
-
-            <ChatInput 
-              onSend={handleSend} 
-              onAction={handleAction} 
-              isLoading={isLoading} 
-              inputMode={inputMode}
-              isConversationStarted={messages.length > 1}
-            />
-          </div>
+          <ChatScreen 
+            messages={messages}
+            onSend={handleSend}
+            onAction={handleAction}
+            onFindStoreForProduct={handleFindStoreForProduct}
+            onPlayAudio={playAudio}
+            isLoading={isLoading}
+            inputMode={inputMode}
+            onBack={() => setCurrentView('home')}
+            onOpenHistory={() => setIsHistoryOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
         )}
 
         {/* VIEW: HOME */}
@@ -448,6 +402,7 @@ export default function App() {
               handleSend('Tìm cửa hàng gần đây');
             }}
             onOpenCalculator={() => setCurrentView('calculator')}
+            onDeleteSession={handleDeleteSession}
           />
         )}
 
@@ -479,6 +434,7 @@ export default function App() {
           onSelectSession={(id) => loadSession(sessions.find(s => s.id === id)!)}
           onNewChat={() => createNewSession(true)}
           onDeleteSession={handleDeleteSession}
+          onClearAll={handleClearAllHistory}
         />
 
         {/* Bottom Navigation (Hidden in Chat and Calculator) */}

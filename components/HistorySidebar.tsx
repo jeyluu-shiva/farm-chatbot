@@ -10,6 +10,7 @@ interface Props {
   onSelectSession: (id: string) => void;
   onNewChat: () => void;
   onDeleteSession: (id: string, e: React.MouseEvent) => void;
+  onClearAll: () => void;
 }
 
 export const HistorySidebar: React.FC<Props> = ({ 
@@ -19,7 +20,8 @@ export const HistorySidebar: React.FC<Props> = ({
   currentSessionId, 
   onSelectSession, 
   onNewChat,
-  onDeleteSession
+  onDeleteSession,
+  onClearAll
 }) => {
   // Sort sessions by newest first
   const sortedSessions = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
@@ -108,10 +110,10 @@ export const HistorySidebar: React.FC<Props> = ({
                   </span>
                 </div>
                 
-                {/* Delete Action */}
+                {/* Delete Action - Always visible for mobile usability */}
                 <button
                   onClick={(e) => onDeleteSession(session.id, e)}
-                  className="absolute right-2 top-3 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  className="absolute right-2 top-3 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title="Xóa"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -121,8 +123,17 @@ export const HistorySidebar: React.FC<Props> = ({
           )}
         </div>
         
-        <div className="p-4 border-t border-slate-100 text-center">
-            <span className="text-[10px] text-slate-400">Dữ liệu được lưu trên thiết bị của bạn</span>
+        <div className="p-4 border-t border-slate-100">
+            {sortedSessions.length > 0 && (
+              <button 
+                onClick={onClearAll}
+                className="w-full mb-3 flex items-center justify-center gap-2 py-2.5 text-red-600 bg-red-50 rounded-xl text-sm font-semibold hover:bg-red-100 active:scale-95 transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+                Xóa tất cả lịch sử
+              </button>
+            )}
+            <span className="text-[10px] text-slate-400 block text-center">Dữ liệu được lưu trên thiết bị của bạn</span>
         </div>
       </div>
     </>

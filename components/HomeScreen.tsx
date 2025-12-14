@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScanSearch, MapPin, Clock, ChevronRight, Leaf, Calculator, ArrowRight } from 'lucide-react';
+import { ScanSearch, MapPin, Clock, ChevronRight, Leaf, Calculator, ArrowRight, Trash2 } from 'lucide-react';
 import { ChatSession, UserProfile } from '../types';
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   onNewChat: () => void;
   onFindStore: () => void;
   onOpenCalculator: () => void;
+  onDeleteSession: (id: string, e: React.MouseEvent) => void;
 }
 
 export const HomeScreen: React.FC<Props> = ({ 
@@ -17,7 +18,8 @@ export const HomeScreen: React.FC<Props> = ({
   onOpenSession, 
   onNewChat,
   onFindStore,
-  onOpenCalculator
+  onOpenCalculator,
+  onDeleteSession
 }) => {
   return (
     <div className="min-h-screen bg-slate-50 pb-24">
@@ -103,20 +105,31 @@ export const HomeScreen: React.FC<Props> = ({
               </div>
             ) : (
               recentSessions.slice(0, 3).map((session) => (
-                <button 
+                <div 
                   key={session.id}
                   onClick={() => onOpenSession(session.id)}
-                  className="w-full bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
+                  className="w-full bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center gap-3 active:scale-[0.98] transition-transform text-left cursor-pointer group relative"
                 >
                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0 text-slate-500">
                     <Clock className="w-5 h-5" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 pr-8">
                     <h3 className="font-semibold text-slate-800 truncate">{session.title}</h3>
                     <p className="text-xs text-slate-500 truncate">{session.preview}</p>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-300" />
-                </button>
+                  
+                  {/* Standard Arrow (hidden on hover/mobile interaction if needed, but keeping for UX) */}
+                  <ChevronRight className="w-5 h-5 text-slate-300 absolute right-4 opacity-100 group-hover:opacity-0 transition-opacity" />
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => onDeleteSession(session.id, e)}
+                    className="absolute right-2 p-2 bg-red-50 text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-100 z-10"
+                    title="Xóa hội thoại"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               ))
             )}
           </div>
