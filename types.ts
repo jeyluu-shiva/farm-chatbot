@@ -2,6 +2,7 @@ export interface Ingredient {
   id: string;
   name: string;
   mechanism: string;
+  priority?: 'High' | 'Medium' | 'Low';
 }
 
 export interface Product {
@@ -22,27 +23,45 @@ export interface Store {
   address: string;
 }
 
+export interface AnalysisResult {
+  summary: {
+    crop: string;
+    disease: string;
+    stage: string;
+    severity: string;
+  };
+  decision: {
+    action: 'spray' | 'no_spray' | 'monitor';
+    label: string; // e.g., "Có thể cân nhắc phun", "Chưa cần phun"
+    reason: string;
+  };
+  ingredients: Ingredient[];
+  products: Product[];
+  warnings: string[]; // Resistance risk, weather notes
+}
+
 export type MessageType = 
   | 'text' 
   | 'actions'
-  | 'ingredients' 
-  | 'products' 
-  | 'stores';
+  | 'analysis_result'
+  | 'stores'
+  | 'ingredients'
+  | 'products';
 
 export interface Message {
   id: string;
   role: 'user' | 'bot';
   type: MessageType;
   content?: string;
-  data?: any; // Stores Ingredient[], Product[], Store[], or actions config
+  data?: any; // Stores AnalysisResult, Store[], etc.
 }
 
-export type UserIntent = 'chat' | 'show_ingredients' | 'show_products' | 'show_stores';
+export type UserIntent = 'chat' | 'analyze_disease' | 'show_stores';
 
 export interface ChatResponse {
   text: string;
-  isDiseaseIdentified: boolean;
-  diseaseName?: string;
+  isAnalysisComplete: boolean;
+  analysisResult?: AnalysisResult;
   intent?: UserIntent;
 }
 
@@ -64,7 +83,7 @@ export interface ChatSession {
   preview: string; // Short preview of the last message or topic
 }
 
-export type AppView = 'onboarding' | 'home' | 'chat' | 'profile' | 'calculator';
+export type AppView = 'onboarding' | 'home' | 'chat' | 'profile' | 'calculator' | 'result';
 
 export interface UserProfile {
   name: string;

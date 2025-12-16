@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, FlaskConical, Pill, Compass, Mic, StopCircle } from 'lucide-react';
+import { Send, Mic, StopCircle } from 'lucide-react';
 
 interface Props {
   onSend: (text: string) => void;
@@ -93,56 +93,23 @@ export const ChatInput: React.FC<Props> = ({ onSend, onAction, isLoading, inputM
 
   // Logic for what to show above input
   const showInitialSuggestions = !isConversationStarted && inputMode === 'default';
-  const showActions = inputMode === 'actions';
 
   return (
     <div className="bg-white border-t border-slate-100 p-3 pb-6 sm:pb-3 w-full transition-all shadow-[0_-1px_3px_rgba(0,0,0,0.02)]">
-      {/* Suggestions or Actions Row - Only show if input is empty */}
-      {!input && (
+      {/* Suggestions Row - Only show if input is empty */}
+      {!input && showInitialSuggestions && (
         <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar py-1 px-1 min-h-[40px]">
-          {showInitialSuggestions && (
-             // Default Suggestions - Only at start
-            suggestions.map((s) => (
-              <button
-                key={s}
-                onClick={() => handleSuggestionClick(s)}
-                disabled={isLoading}
-                className="whitespace-nowrap bg-slate-50 border border-slate-200 text-slate-600 px-3 py-1.5 rounded-full text-sm font-medium active:bg-emerald-50 active:text-emerald-700 transition-colors animate-fade-in"
-              >
-                {s}
-              </button>
-            ))
-          )}
-
-          {showActions && (
-            // Action Buttons - Only when disease identified
-            <>
-              <button
-                onClick={() => onAction('ingredients')}
-                disabled={isLoading}
-                className="flex items-center gap-1.5 whitespace-nowrap bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-sm font-semibold shadow-sm active:scale-95 transition-all hover:bg-emerald-100 animate-fade-in"
-              >
-                <FlaskConical className="w-4 h-4" />
-                Hoạt chất
-              </button>
-              <button
-                onClick={() => onAction('products')}
-                disabled={isLoading}
-                className="flex items-center gap-1.5 whitespace-nowrap bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-sm font-semibold shadow-sm active:scale-95 transition-all hover:bg-emerald-100 animate-fade-in"
-              >
-                <Pill className="w-4 h-4" />
-                Thuốc
-              </button>
-              <button
-                onClick={() => onAction('stores')}
-                disabled={isLoading}
-                className="flex items-center gap-1.5 whitespace-nowrap bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-sm font-semibold shadow-sm active:scale-95 transition-all hover:bg-emerald-100 animate-fade-in"
-              >
-                <Compass className="w-4 h-4" />
-                Nơi bán
-              </button>
-            </>
-          )}
+           {/* Default Suggestions - Only at start */}
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              onClick={() => handleSuggestionClick(s)}
+              disabled={isLoading}
+              className="whitespace-nowrap bg-slate-50 border border-slate-200 text-slate-600 px-3 py-1.5 rounded-full text-sm font-medium active:bg-emerald-50 active:text-emerald-700 transition-colors animate-fade-in"
+            >
+              {s}
+            </button>
+          ))}
         </div>
       )}
 
@@ -153,7 +120,7 @@ export const ChatInput: React.FC<Props> = ({ onSend, onAction, isLoading, inputM
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isListening ? "Đang nghe..." : (showActions ? "Hỏi thêm về bệnh này..." : "Nhập tên bệnh hoặc câu hỏi...")}
+            placeholder={isListening ? "Đang nghe..." : "Nhập tên bệnh hoặc câu hỏi..."}
             className={`w-full bg-slate-50 border rounded-full py-3 pl-4 pr-12 text-slate-800 text-base shadow-sm focus:outline-none transition-all ${
               isListening 
                 ? 'border-red-400 ring-2 ring-red-100 placeholder-red-400' 

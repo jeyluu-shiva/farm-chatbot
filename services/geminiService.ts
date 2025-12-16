@@ -1,5 +1,5 @@
 import { GoogleGenAI, GenerateContentResponse, Type, Modality } from "@google/genai";
-import { BotConfig, Message, UserIntent } from "../types";
+import { BotConfig, Message, AnalysisResult } from "../types";
 
 const apiKey = process.env.API_KEY || '';
 let ai: GoogleGenAI | null = null;
@@ -12,83 +12,149 @@ export const analyzeDisease = async (
   input: string, 
   config: BotConfig, 
   history: Message[]
-): Promise<{ text: string, isDiseaseIdentified: boolean, diseaseName?: string, intent?: UserIntent }> => {
+): Promise<{ text: string, isAnalysisComplete: boolean, analysisResult?: AnalysisResult }> => {
   if (!ai) {
     console.warn("API Key not found, using mock response");
-    const isDisease = input.toLowerCase().includes('đạo ôn') || input.toLowerCase().includes('bệnh');
+    // Mock logic for demo without API key
+    const isReady = history.length > 2; // Simple mock check
+    if (!isReady) {
+      return {
+        text: "Để tư vấn chính xác, bác cho tôi biết bệnh này xuất hiện ở giai đoạn nào của cây lúa? (Mạ, đẻ nhánh, hay trổ chín?)",
+        isAnalysisComplete: false
+      };
+    }
+    
     return {
-      text: isDisease 
-        ? "Dựa trên mô tả, có thể cây trồng đang bị bệnh Đạo ôn (cháy lá). Bệnh do nấm Pyricularia oryzae gây ra."
-        : "Chào bạn, tôi là trợ lý nông nghiệp. Bạn có thể hỏi tôi về các loại bệnh trên cây trồng.",
-      isDiseaseIdentified: isDisease,
-      diseaseName: isDisease ? "Đạo ôn" : undefined,
-      intent: 'chat'
+      text: "Đã có đủ thông tin. Dưới đây là kết quả phân tích:",
+      isAnalysisComplete: true,
+      analysisResult: {
+        summary: {
+          crop: "Lúa",
+          disease: "Đạo ôn lá",
+          stage: "Đẻ nhánh",
+          severity: "Vừa phải"
+        },
+        decision: {
+          action: "spray",
+          label: "Có thể cân nhắc phun",
+          reason: "Bệnh chớm xuất hiện nhưng điều kiện thời tiết âm u, ẩm độ cao thuận lợi cho nấm phát triển. Nên phun phòng ngừa lây lan."
+        },
+        ingredients: [
+          { id: "i1", name: "Tricyclazole", mechanism: "Nội hấp, lưu dẫn mạnh, hiệu lực kéo dài.", priority: "High" },
+          { id: "i2", name: "Isoprothiolane", mechanism: "Đặc trị đạo ôn, giúp cây phục hồi nhanh.", priority: "Medium" }
+        ],
+        products: [
+          { id: "p1", name: "Beam 75WP", activeIngredient: "Tricyclazole", formulation: "WP", usage: "18g/bình 16L" },
+          { id: "p2", name: "Fuji-One 40EC", activeIngredient: "Isoprothiolane", formulation: "EC", usage: "30ml/bình 16L" }
+        ],
+        warnings: [
+          "Lưu ý thời tiết: Không phun khi trời sắp mưa.",
+          "Nguy cơ kháng thuốc: Nên luân phiên các gốc thuốc khác nhau nếu phải phun lại lần 2.",
+          "Tuân thủ nguyên tắc 4 đúng."
+        ]
+      }
     };
   }
 
-  // Construct System Prompt based on Config
-  let toneInstruction = "Keep the tone professional, friendly, and simple.";
-  if (config.tone === 'friendly') {
-    toneInstruction = "Bạn là người bạn nhà nông, dùng từ ngữ cực kỳ gần gũi, xưng hô 'tôi' và 'bác/anh/chị', giọng văn ấm áp, động viên.";
-  } else if (config.tone === 'expert') {
-    toneInstruction = "Bạn là kỹ sư nông nghiệp đầu ngành. Dùng thuật ngữ chính xác, phong thái nghiêm túc, khoa học, khách quan.";
-  } else if (config.tone === 'humorous') {
-    toneInstruction = "Bạn là trợ lý vui tính. Hãy trả lời một cách hài hước, dùng các ví von thú vị, làm cho người nông dân cười nhưng vẫn cung cấp đủ thông tin.";
-  } else if (config.tone === 'western') {
-    toneInstruction = "Bạn là một lão nông tri điền người Miền Tây Nam Bộ, nói chuyện rặt tiếng miền Tây, hào sảng, chất phác. BẮT BUỘC dùng từ ngữ địa phương (tui, hông, nghen, đa, mần, trển, bển, dìa...). Xưng hô 'Tui' và gọi người dùng là 'Bà con', 'Bác Ba', 'Anh Tư', 'Chị Năm'. Phong thái chân tình, nồng hậu, coi người dùng như người nhà.";
-  }
-
-  let lengthInstruction = "Answer in 2-3 short sentences.";
-  if (config.length === 'concise') lengthInstruction = "Trả lời cực kỳ ngắn gọn, súc tích, đi thẳng vào vấn đề. Không quá 40 từ.";
-  if (config.length === 'detailed') lengthInstruction = "Trả lời chi tiết, giải thích rõ nguyên nhân, cơ chế và hướng dẫn cụ thể. Cung cấp đầy đủ bối cảnh.";
-
   // Format History
-  // We take the last 10 messages to maintain context without overloading tokens
   const contextMessages = history
     .filter(m => m.type === 'text')
     .slice(-10)
-    .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+    .map(m => `${m.role === 'user' ? 'Farmer' : 'Officer'}: ${m.content}`)
     .join('\n');
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: `
-      You are a Vietnamese agricultural assistant helping farmers.
+      You are a professional Agricultural Officer (Cán bộ BVTV) helping a farmer.
       
-      TONE INSTRUCTION: ${toneInstruction}
-      LENGTH INSTRUCTION: ${lengthInstruction}
+      YOUR GOAL: Provide a neutral, safe, and professional consultation. Do NOT act like a salesperson.
+      
+      PROCESS:
+      1.  **Information Collection**: You must collect the following 4 pieces of information before giving advice. Ask ONE question at a time if information is missing.
+          - Crop type (Cây gì)
+          - Disease/Symptoms (Bệnh gì/Triệu chứng)
+          - Growth Stage (Giai đoạn sinh trưởng)
+          - Severity/Location (Mức độ/Vị trí)
+      2.  **Analysis**: Once you have all 4 pieces of information, output the analysis result.
 
-      CONTEXT FROM PREVIOUS CHAT:
+      TONE:
+      - Professional, calm, trustworthy, field-oriented.
+      - Use "Cân nhắc" (Consider) instead of "Phải" (Must).
+      - Use "Phù hợp" (Suitable) instead of "Tốt nhất" (Best).
+
+      CONTEXT FROM CHAT:
       ${contextMessages}
 
-      CURRENT USER INPUT: "${input}"
+      CURRENT INPUT: "${input}"
 
       INSTRUCTIONS:
-      1. Answer the user's input based on the previous context if applicable.
-      2. If the user mentions a NEW crop disease, identify it and return isDiseaseIdentified = true.
-      3. If the user is asking a follow-up question about a previously identified disease, keep the context but return isDiseaseIdentified = false.
-      4. INTENT DETECTION:
-         - If user asks for "active ingredients", "chemicals", "substances" (hoạt chất), set intent = 'show_ingredients'.
-         - If user asks for "medicines", "products", "drugs", "treatment" (thuốc, cách trị bằng thuốc), set intent = 'show_products'.
-         - If user asks for "stores", "where to buy", "locations" (cửa hàng, mua ở đâu, đại lý), set intent = 'show_stores'.
-         - Otherwise, set intent = 'chat'.
+      - If information is missing, set 'isAnalysisComplete' to false and ask the next question in 'text'. Explain WHY you are asking (e.g., "Để chọn thuốc đúng, bác cho biết lúa đang giai đoạn nào?").
+      - If information is sufficient, set 'isAnalysisComplete' to true, set 'text' to a short confirmation (e.g., "Tôi đã nắm được tình hình. Đang phân tích..."), and fill the 'analysisResult' object.
       `,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            text: { type: Type.STRING, description: "The response to the user in Vietnamese." },
-            isDiseaseIdentified: { type: Type.BOOLEAN, description: "True if a SPECIFIC plant disease was identified in this turn." },
-            diseaseName: { type: Type.STRING, description: "The name of the disease if identified." },
-            intent: { 
-              type: Type.STRING, 
-              enum: ['chat', 'show_ingredients', 'show_products', 'show_stores'],
-              description: "The user's intent to view specific app sections." 
+            text: { type: Type.STRING, description: "The response text (question or confirmation)." },
+            isAnalysisComplete: { type: Type.BOOLEAN, description: "True ONLY if crop, disease, stage, and severity are known." },
+            analysisResult: {
+              type: Type.OBJECT,
+              description: "Structured analysis result. Only required if isAnalysisComplete is true.",
+              properties: {
+                summary: {
+                  type: Type.OBJECT,
+                  properties: {
+                    crop: { type: Type.STRING },
+                    disease: { type: Type.STRING },
+                    stage: { type: Type.STRING },
+                    severity: { type: Type.STRING }
+                  }
+                },
+                decision: {
+                  type: Type.OBJECT,
+                  properties: {
+                    action: { type: Type.STRING, enum: ['spray', 'no_spray', 'monitor'] },
+                    label: { type: Type.STRING },
+                    reason: { type: Type.STRING }
+                  }
+                },
+                ingredients: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      name: { type: Type.STRING },
+                      mechanism: { type: Type.STRING },
+                      priority: { type: Type.STRING, enum: ['High', 'Medium', 'Low'] }
+                    }
+                  }
+                },
+                products: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      name: { type: Type.STRING },
+                      activeIngredient: { type: Type.STRING },
+                      formulation: { type: Type.STRING },
+                      usage: { type: Type.STRING },
+                      description: { type: Type.STRING }
+                    }
+                  }
+                },
+                warnings: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                }
+              }
             }
           },
-          required: ["text", "isDiseaseIdentified"]
+          required: ["text", "isAnalysisComplete"]
         }
       }
     });
@@ -96,16 +162,14 @@ export const analyzeDisease = async (
     const result = JSON.parse(response.text || '{}');
     return {
       text: result.text || "Xin lỗi, tôi chưa rõ câu hỏi.",
-      isDiseaseIdentified: !!result.isDiseaseIdentified,
-      diseaseName: result.diseaseName,
-      intent: result.intent as UserIntent || 'chat'
+      isAnalysisComplete: !!result.isAnalysisComplete,
+      analysisResult: result.analysisResult
     };
   } catch (error) {
     console.error("Gemini API Error", error);
     return {
       text: "Xin lỗi, hiện tại tôi không thể kết nối tới máy chủ.",
-      isDiseaseIdentified: false,
-      intent: 'chat'
+      isAnalysisComplete: false
     };
   }
 };
@@ -128,7 +192,6 @@ export const speakText = async (text: string, voiceName: string): Promise<string
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    // Return raw base64 string because it is PCM data, not MP3
     return base64Audio || null;
   } catch (error) {
     console.error("TTS Error", error);

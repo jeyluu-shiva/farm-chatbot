@@ -6,7 +6,8 @@ import { IngredientsCard } from './IngredientsCard';
 import { ProductsCard } from './ProductsCard';
 import { StoresCard } from './StoresCard';
 import { RatingSheet } from './RatingSheet';
-import { Message } from '../types';
+import { Message, AnalysisResult } from '../types';
+import { ArrowRight, FileText } from 'lucide-react';
 
 interface Props {
   messages: Message[];
@@ -14,6 +15,7 @@ interface Props {
   onAction: (action: 'ingredients' | 'products' | 'stores') => void;
   onFindStoreForProduct: (productName: string) => void;
   onPlayAudio: (text: string) => Promise<void>;
+  onViewResult?: (result: AnalysisResult) => void;
   isLoading: boolean;
   inputMode: 'default' | 'actions';
   onBack: () => void;
@@ -28,6 +30,7 @@ export const ChatScreen: React.FC<Props> = ({
   onAction,
   onFindStoreForProduct,
   onPlayAudio,
+  onViewResult,
   isLoading,
   inputMode,
   onBack,
@@ -37,7 +40,7 @@ export const ChatScreen: React.FC<Props> = ({
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [showRating, setShowRating] = useState(false);
-  const [hasRated, setHasRated] = useState(false); // Only ask once per session view
+  const [hasRated, setHasRated] = useState(false);
   const timerRef = useRef<any>(null);
 
   // Auto scroll
@@ -47,21 +50,15 @@ export const ChatScreen: React.FC<Props> = ({
 
   // Inactivity Timer Logic
   useEffect(() => {
-    // Reset state when messages change (user or bot talks)
     setShowRating(false);
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    // Conditions to start timer:
-    // 1. Not loading
-    // 2. Hasn't rated yet in this view
-    // 3. Conversation has started (length > 1)
-    // 4. Last message is from BOT (don't interrupt user typing)
     const lastMessage = messages[messages.length - 1];
     
     if (!isLoading && !hasRated && messages.length > 1 && lastMessage?.role === 'bot') {
       timerRef.current = setTimeout(() => {
         setShowRating(true);
-      }, 30000); // 30 seconds of inactivity
+      }, 30000); 
     }
 
     return () => {
@@ -77,7 +74,7 @@ export const ChatScreen: React.FC<Props> = ({
   };
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full relative bg-slate-50">
       <Header 
         showBack={true}
         onBack={onBack}
@@ -97,6 +94,30 @@ export const ChatScreen: React.FC<Props> = ({
               />
             );
           }
+          if (msg.type === 'analysis_result' && msg.data) {
+            // Replaced inline card with a discrete button
+            return (
+              <div key={msg.id} className="flex justify-start mb-6 animate-fade-in-up">
+                 <button 
+                   onClick={() => onViewResult && onViewResult(msg.data)}
+                   className="flex items-center gap-3 bg-white border border-emerald-100 text-emerald-700 px-5 py-4 rounded-2xl shadow-sm hover:shadow-md hover:border-emerald-200 active:scale-95 transition-all w-full max-w-[85%]"
+                 >
+                   <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center flex-shrink-0">
+                     <FileText className="w-5 h-5 text-emerald-600" />
+                   </div>
+                   <div className="flex-1 text-left">
+                     <span className="block font-bold text-slate-800">Kết quả phân tích</span>
+                     <span className="text-xs text-slate-500">Nhấn để xem chi tiết</span>
+                   </div>
+                   <ArrowRight className="w-5 h-5 text-emerald-400" />
+                 </button>
+              </div>
+            );
+          }
+          if (msg.type === 'stores') {
+            return <StoresCard key={msg.id} stores={msg.data} />;
+          }
+          // Legacy support or specific requested actions
           if (msg.type === 'ingredients') {
             return <IngredientsCard key={msg.id} ingredients={msg.data} />;
           }
@@ -109,9 +130,6 @@ export const ChatScreen: React.FC<Props> = ({
               />
             );
           }
-          if (msg.type === 'stores') {
-            return <StoresCard key={msg.id} stores={msg.data} />;
-          }
           return null;
         })}
         
@@ -120,20 +138,19 @@ export const ChatScreen: React.FC<Props> = ({
             <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center mt-1">
               <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
             </div>
-            <div className="bg-white border border-slate-100 p-4 rounded-2xl rounded-tl-none text-slate-400 italic text-sm">
-              Đang suy nghĩ...
+            <div className="bg-white border border-slate-100 p-4 rounded-2xl rounded-tl-none text-slate-400 italic text-sm shadow-sm">
+              Đang phân tích...
             </div>
           </div>
         )}
         <div ref={bottomRef} />
       </main>
 
-      {/* Rating Sheet Overlay */}
       <RatingSheet 
         isOpen={showRating} 
         onClose={() => {
           setShowRating(false);
-          setHasRated(true); // Don't show again if closed
+          setHasRated(true);
         }}
         onRate={handleRate}
       />

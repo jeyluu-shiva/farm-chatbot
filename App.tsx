@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ChatScreen } from './components/ChatScreen';
+import { ResultScreen } from './components/ResultScreen';
 import { SettingsModal } from './components/SettingsModal';
 import { HistorySidebar } from './components/HistorySidebar';
 import { OnboardingScreen } from './components/OnboardingScreen';
@@ -8,42 +9,10 @@ import { HomeScreen } from './components/HomeScreen';
 import { BottomNav } from './components/BottomNav';
 import { ProfileScreen } from './components/ProfileScreen';
 import { SweetPotatoCalculator } from './components/SweetPotatoCalculator';
-import { Message, Ingredient, Product, Store, BotConfig, ChatSession, AppView, UserProfile } from './types';
+import { Message, Ingredient, Product, Store, BotConfig, ChatSession, AppView, UserProfile, AnalysisResult } from './types';
 import { analyzeDisease, speakText } from './services/geminiService';
 
 // Mock Data
-const MOCK_INGREDIENTS: Ingredient[] = [
-  { id: '1', name: 'Propiconazole', mechanism: 'Ức chế tổng hợp ergosterol của nấm, làm nấm không phát triển được.' },
-  { id: '2', name: 'Tricyclazole', mechanism: 'Ngăn chặn sự hình thành vách tế bào nấm, đặc trị đạo ôn.' },
-];
-
-const MOCK_PRODUCTS: Product[] = [
-  { 
-    id: '1', 
-    name: 'Filia 525SE', 
-    activeIngredient: 'Propiconazole + Tricyclazole', 
-    formulation: 'SE',
-    description: 'Đặc trị đạo ôn lá, đạo ôn cổ bông, lem lép hạt. Giúp lúa xanh lá, cứng cây, tối ưu năng suất.',
-    usage: 'Pha 20-25ml / bình 25 lít. Phun khi bệnh chớm xuất hiện. Lặp lại sau 7-10 ngày nếu bệnh nặng.'
-  },
-  { 
-    id: '2', 
-    name: 'Beam 75WP', 
-    activeIngredient: 'Tricyclazole', 
-    formulation: 'WP',
-    description: 'Thuốc đặc trị bệnh đạo ôn (cháy lá) trên lúa. Hiệu lực kéo dài, hấp thu nhanh, hạn chế rửa trôi do mưa.',
-    usage: 'Pha 18g / bình 16 lít. Lượng nước phun 400-500 lít/ha. Phun ướt đều tán lá.'
-  },
-  { 
-    id: '3', 
-    name: 'Tilt Super 300EC', 
-    activeIngredient: 'Propiconazole', 
-    formulation: 'EC',
-    description: 'Tiêu diệt nấm bệnh nhanh chóng. Trị lem lép hạt, vàng lá, đốm vằn. Giúp hạt lúa sáng đẹp.',
-    usage: 'Pha 10-15ml / bình 16 lít. Phun phòng hoặc phun trị khi bệnh mới xuất hiện.'
-  },
-];
-
 const MOCK_STORES: Store[] = [
   { id: '1', name: 'Cửa hàng VTNN Ba Minh', distance: '1.2 km', tags: ['Gần bạn', 'Có thể có thuốc phù hợp'], phone: '0912345678', address: 'Ấp 3, Xã Tân Thạnh, Long An' },
   { id: '2', name: 'Đại lý Hai Lúa', distance: '3.5 km', tags: ['Chuyên BVTV', 'Uy tín'], phone: '0987654321', address: 'Thị trấn Bến Lức, Long An' },
@@ -53,7 +22,7 @@ const DEFAULT_WELCOME_MSG: Message = {
   id: 'welcome', 
   role: 'bot', 
   type: 'text', 
-  content: 'Chào anh/chị. Tôi là trợ lý BVTV. Anh/chị đang gặp vấn đề gì trên cây trồng?' 
+  content: 'Chào bác. Tôi là trợ lý BVTV. Để hỗ trợ tốt nhất, bác cho tôi biết bác đang canh tác cây gì và đang gặp vấn đề gì ạ?' 
 };
 
 // Audio Helper Functions
@@ -97,6 +66,7 @@ export default function App() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([DEFAULT_WELCOME_MSG]);
+  const [currentAnalysisResult, setCurrentAnalysisResult] = useState<AnalysisResult | null>(null);
   
   // UI State
   const [isLoading, setIsLoading] = useState(false);
@@ -155,7 +125,12 @@ export default function App() {
       const updatedSessions = prevSessions.map(session => {
         if (session.id === currentSessionId) {
           const lastMsg = messages[messages.length - 1];
-          const preview = lastMsg?.content ? lastMsg.content.substring(0, 50) + (lastMsg.content.length > 50 ? '...' : '') : 'Đang chat...';
+          // Update preview text
+          let preview = 'Đang chat...';
+          if (lastMsg) {
+             if (lastMsg.type === 'text' && lastMsg.content) preview = lastMsg.content.substring(0, 50);
+             else if (lastMsg.type === 'analysis_result') preview = 'Kết quả phân tích';
+          }
           
           return {
             ...session,
@@ -201,6 +176,7 @@ export default function App() {
     setCurrentSessionId(newId);
     setMessages([DEFAULT_WELCOME_MSG]);
     setInputMode('default');
+    setCurrentAnalysisResult(null);
     
     if (switchToChat) {
       setCurrentView('chat');
@@ -211,8 +187,18 @@ export default function App() {
   const loadSession = (session: ChatSession) => {
     setCurrentSessionId(session.id);
     setMessages(session.messages);
-    setInputMode(session.messages.some(m => m.data && (m.type === 'ingredients' || m.type === 'products')) ? 'actions' : 'default');
-    setCurrentView('chat');
+    
+    // Find last analysis result if any
+    const lastResultMsg = [...session.messages].reverse().find(m => m.type === 'analysis_result');
+    if (lastResultMsg?.data) {
+      setCurrentAnalysisResult(lastResultMsg.data);
+      setCurrentView('result'); // Open result directly for completed sessions
+    } else {
+      setCurrentAnalysisResult(null);
+      setCurrentView('chat');
+    }
+    
+    setInputMode(session.messages.some(m => m.type === 'analysis_result') ? 'actions' : 'default');
     setIsHistoryOpen(false);
   };
 
@@ -247,7 +233,6 @@ export default function App() {
 
   const handleRateSession = (rating: number, feedback: string) => {
     console.log(`Rating for session ${currentSessionId}: ${rating} stars. Feedback: ${feedback}`);
-    // Here you would typically send this to an API
   };
 
   // Chat Actions
@@ -266,9 +251,12 @@ export default function App() {
     setMessages(updatedMessages);
     setIsLoading(true);
 
+    // Call API logic
     const response = await analyzeDisease(text, botConfig, updatedMessages);
 
     const newMessages: Message[] = [];
+    
+    // Always add the text response (question or confirmation)
     newMessages.push({
       id: (Date.now() + 1).toString(),
       role: 'bot',
@@ -276,19 +264,26 @@ export default function App() {
       content: response.text
     });
 
-    if (response.intent === 'show_ingredients') {
-      newMessages.push({ id: (Date.now() + 2).toString(), role: 'bot', type: 'ingredients', data: MOCK_INGREDIENTS });
-    } else if (response.intent === 'show_products') {
-      newMessages.push({ id: (Date.now() + 2).toString(), role: 'bot', type: 'products', data: MOCK_PRODUCTS });
-    } else if (response.intent === 'show_stores') {
-      newMessages.push({ id: (Date.now() + 2).toString(), role: 'bot', type: 'stores', data: MOCK_STORES });
-    }
-    
-    setMessages(prev => [...prev, ...newMessages]);
-    
-    if (response.isDiseaseIdentified) {
-      setInputMode('actions');
+    // If analysis is complete, add result message AND switch view
+    if (response.isAnalysisComplete && response.analysisResult) {
+       const resultMsg: Message = {
+         id: (Date.now() + 2).toString(),
+         role: 'bot',
+         type: 'analysis_result',
+         data: response.analysisResult
+       };
+       newMessages.push(resultMsg);
+
+       // Update state
+       setMessages(prev => [...prev, ...newMessages]);
+       setCurrentAnalysisResult(response.analysisResult);
+       
+       // Switch to separate result screen
+       setCurrentView('result');
+       setInputMode('default');
     } else {
+       // Normal chat continuation
+       setMessages(prev => [...prev, ...newMessages]);
        setInputMode('default');
     }
     
@@ -302,16 +297,13 @@ export default function App() {
 
     const userMsg: Message = { id: Date.now().toString(), role: 'user', type: 'text', content: userActionText };
     
-    let botResponse: Message;
-    if (action === 'ingredients') {
-      botResponse = { id: (Date.now() + 1).toString(), role: 'bot', type: 'ingredients', data: MOCK_INGREDIENTS };
-    } else if (action === 'products') {
-      botResponse = { id: (Date.now() + 1).toString(), role: 'bot', type: 'products', data: MOCK_PRODUCTS };
-    } else {
+    let botResponse: Message | null = null;
+    
+    if (action === 'stores') {
       botResponse = { id: (Date.now() + 1).toString(), role: 'bot', type: 'stores', data: MOCK_STORES };
     }
-
-    setMessages(prev => [...prev, userMsg, botResponse]);
+    
+    setMessages(prev => botResponse ? [...prev, userMsg, botResponse] : [...prev, userMsg]);
   };
 
   const handleFindStoreForProduct = (productName: string) => {
@@ -340,12 +332,10 @@ export default function App() {
       
       const ctx = audioContextRef.current;
       
-      // Ensure context is running (it can be suspended by browser policies)
       if (ctx.state === 'suspended') {
         await ctx.resume();
       }
 
-      // Decode and play
       const bytes = decodeBase64(base64Audio);
       const buffer = arrayBufferToAudioBuffer(bytes, ctx);
 
@@ -370,16 +360,36 @@ export default function App() {
     return <OnboardingScreen onComplete={handleStartOnboarding} />;
   }
 
-  // CALCULATOR VIEW (Full Screen)
+  // CALCULATOR VIEW
   if (currentView === 'calculator') {
     return <SweetPotatoCalculator onBack={() => setCurrentView('home')} />;
+  }
+
+  // RESULT VIEW
+  if (currentView === 'result' && currentAnalysisResult) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex justify-center">
+        <div className="w-full max-w-md bg-white min-h-screen shadow-2xl overflow-hidden flex flex-col relative">
+          <ResultScreen 
+            result={currentAnalysisResult}
+            stores={MOCK_STORES}
+            onBack={() => setCurrentView('chat')} // Let user go back to chat history
+            onNewCase={() => createNewSession(true)}
+            onSaveAndExit={() => {
+              alert('Đã lưu trường hợp vào lịch sử!');
+              setCurrentView('home');
+            }}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex justify-center">
       <div className="w-full max-w-md bg-white min-h-screen shadow-2xl overflow-hidden flex flex-col relative">
         
-        {/* VIEW: CHAT - Now delegated to ChatScreen component */}
+        {/* VIEW: CHAT */}
         {currentView === 'chat' && (
           <ChatScreen 
             messages={messages}
@@ -387,6 +397,10 @@ export default function App() {
             onAction={handleAction}
             onFindStoreForProduct={handleFindStoreForProduct}
             onPlayAudio={playAudio}
+            onViewResult={(result) => {
+              setCurrentAnalysisResult(result);
+              setCurrentView('result');
+            }}
             isLoading={isLoading}
             inputMode={inputMode}
             onBack={() => setCurrentView('home')}
@@ -421,7 +435,7 @@ export default function App() {
           />
         )}
 
-        {/* Global Modals (accessible from multiple views mainly Chat and Profile) */}
+        {/* Global Modals */}
         <SettingsModal 
           isOpen={isSettingsOpen} 
           onClose={() => setIsSettingsOpen(false)}
@@ -443,8 +457,8 @@ export default function App() {
           onClearAll={handleClearAllHistory}
         />
 
-        {/* Bottom Navigation (Hidden in Chat and Calculator) */}
-        {currentView !== 'chat' && (
+        {/* Bottom Navigation (Hidden in Chat, Calculator, Result) */}
+        {currentView !== 'chat' && currentView !== 'result' && (
           <BottomNav 
             currentView={currentView} 
             onChange={setCurrentView} 
